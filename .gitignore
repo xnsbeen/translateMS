@@ -105,10 +105,10 @@ fabric.properties
 
 #personal environment file
 venv/
-./data/preprocessed_train_data.tfrecords
-./data/preprocessed_valid_data.tfrecords
-./data/preprocessed_test_data.tfrecords
-./data/raw_msms_data.tfrecords
+/data/preprocessed_train_data.tfrecords
+/data/preprocessed_valid_data.tfrecords
+/data/preprocessed_test_data.tfrecords
+/data/raw_msms_data.tfrecords
 
 © 2021 GitHub, Inc.
 Terms
