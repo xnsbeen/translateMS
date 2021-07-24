@@ -44,7 +44,7 @@ for file_name in os.listdir(path_mgf_info):
         sequence = row['Sequence']
         dict_msms[title] = {'score': score, 'sequence': sequence}
 
-record_file = 'raw_msms_data.tfrecords'
+record_file = 'real_raw_msms_data.tfrecords'
 
 with tf.io.TFRecordWriter(record_file) as writer:
     for file_name in os.listdir(path_mgf):

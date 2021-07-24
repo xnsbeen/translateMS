@@ -7,13 +7,13 @@ from data.msms import encode_to_int
 from data.msms import save_preprocessed_data
 
 data_loader = DataLoader()
-dataset = data_loader.load('raw_msms_data.tfrecords')
+dataset = data_loader.load('raw_msms_theoretical_data.tfrecords')
 
 #record_size = None -> load whole data
-record_size = 100000
+record_size = 1000
 
 train_dataset, valid_dataset, test_dataset \
-    = data_loader.split(dataset, record_size=record_size, train_prop=0.9, valid_prop=0.05)
+    = data_loader.split(dataset, record_size=record_size, train_prop=0.99, valid_prop=0.005)
 
 max_num_peeks = 500
 
@@ -25,10 +25,10 @@ def prepare_data(dataset):
     intensity_list = []
 
     for record in dataset:
-        sequence = record['sequence'].numpy().decode('utf-8')
-        score = record['score'].numpy()
+        #score = record['score'].numpy()
         mz = np.array(record['mz'].values)
         intensity = np.array(record['intensity'].values)
+        sequence = record['sequence'].numpy().decode('utf-8')
 
         # Pick the index list of 500 largest intensity peeks
         index_max_intensity = np.sort((-intensity).argsort()[:max_num_peeks])

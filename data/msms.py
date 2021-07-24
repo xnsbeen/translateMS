@@ -6,7 +6,7 @@ class DataLoader:
     def __init__(self):
         self.feature_description = {
             'sequence': tf.io.FixedLenFeature([], tf.string),
-            'score': tf.io.FixedLenFeature([], tf.float32),
+            #'score': tf.io.FixedLenFeature([], tf.float32),
             'mz': tf.io.VarLenFeature(tf.int64),
             'intensity': tf.io.VarLenFeature(tf.float32),
         }
@@ -20,8 +20,8 @@ class DataLoader:
       # Parse the input `tf.train.Example` proto using the dictionary above.
       return tf.io.parse_single_example(example_proto, self.feature_description)
 
-    def split(self, dataset, record_size=None, train_prop=0.9, valid_prop= 0.05,test_prop=0.05):
-        dataset = dataset.shuffle(buffer_size=500000)
+    def split(self, dataset, record_size=None, train_prop=0.99, valid_prop= 0.01,test_prop=0.01):
+        dataset = dataset.shuffle(buffer_size=10000000)
 
         if record_size != None:
             dataset = dataset.take(record_size)

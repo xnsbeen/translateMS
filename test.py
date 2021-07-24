@@ -44,15 +44,22 @@ train_batches = (train_dataset
                  .padded_batch(BATCH_SIZE)
                  .prefetch(tf.data.AUTOTUNE))
 
+for mz, sequence in train_batches:
+    print(mz, sequence)
+
 def evaluate(dataset, max_length=50):
-    for mz, sequence in dataset.take(5):
+    for mz, sequence in dataset.padded_batch(1).take(1):
         print(mz, sequence)
+        '''
         len_seq = sequence.shape[0]
         start, end = sequence[0], sequence[len_seq-1]
         print(start, end)
 
         tens = tf.convert_to_tensor([1])
         print(tf.expand_dims(tens,0))
+        '''
 
 
-evaluate(valid_dataset)
+start_time = time.time()
+
+print(1e7)
