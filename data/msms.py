@@ -21,7 +21,8 @@ class DataLoader:
       return tf.io.parse_single_example(example_proto, self.feature_description)
 
     def split(self, dataset, record_size=None, train_prop=0.99, valid_prop= 0.01,test_prop=0.01):
-        dataset = dataset.shuffle(buffer_size=10000000)
+        #
+        #dataset = dataset.shuffle(buffer_size=1000000)
 
         if record_size != None:
             dataset = dataset.take(record_size)

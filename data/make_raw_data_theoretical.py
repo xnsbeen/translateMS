@@ -12,11 +12,6 @@ def _float_feature(value):
     """Returns a float_list from a float / double."""
     return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
 
-def _int64_feature(value):
-    """Returns an int64_list from a bool / enum / int / uint."""
-    print(value)
-    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
-
 def _float_feature_list(value):
     """Returns a float_list from a float / double."""
     return tf.train.Feature(float_list=tf.train.FloatList(value=value))
@@ -33,7 +28,7 @@ record_file = 'theoretical_raw_msms_data.tfrecords'
 starting_time = time.time()
 
 with tf.io.TFRecordWriter(record_file) as writer:
-    for i in range(int(1e7)) :
+    for i in range(1000000) :
             if(i%10000==0) :
                 print(f'[count] : {i}', f'[time] : {time.time()-starting_time}')
 

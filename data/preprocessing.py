@@ -7,10 +7,10 @@ from data.msms import encode_to_int
 from data.msms import save_preprocessed_data
 
 data_loader = DataLoader()
-dataset = data_loader.load('raw_msms_theoretical_data.tfrecords')
+dataset = data_loader.load('theoretical_raw_msms_data.tfrecords')
 
 #record_size = None -> load whole data
-record_size = 1000
+record_size = 1000000
 
 train_dataset, valid_dataset, test_dataset \
     = data_loader.split(dataset, record_size=record_size, train_prop=0.99, valid_prop=0.005)

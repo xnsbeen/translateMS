@@ -38,14 +38,14 @@ mz_vocab_size = len(mz_vocab)
 AA_vocab_size = len(AA_vocab)
 
 #Set batchs
+'''
 BATCH_SIZE = 64
 train_batches = (train_dataset
                  .map(parse_function)
                  .padded_batch(BATCH_SIZE)
                  .prefetch(tf.data.AUTOTUNE))
+'''
 
-for mz, sequence in train_batches:
-    print(mz, sequence)
 
 def evaluate(dataset, max_length=50):
     for mz, sequence in dataset.padded_batch(1).take(1):
@@ -60,6 +60,29 @@ def evaluate(dataset, max_length=50):
         '''
 
 
-start_time = time.time()
+emb = tf.convert_to_tensor(
+    [
+    [[1, 2, 3,5],
+    [3, 3, 5,7],
+    [4, 6, 7,8]],
 
-print(1e7)
+    [[1, 2, 3,2],
+    [3, 3, 5,1],
+    [4, 6, 7,2]]
+    ],
+    dtype= tf.int64)
+
+d_model = 4
+
+inten = tf.convert_to_tensor(
+        [[1, 2, 3],
+         [3, 3, 3]],
+    dtype=tf.int64)
+
+print(inten[:,:,tf.newaxis])
+inten = inten[:,:,tf.newaxis]
+t = tf.repeat(inten, d_model, axis = 2)
+
+print(t)
+
+print(emb*t)

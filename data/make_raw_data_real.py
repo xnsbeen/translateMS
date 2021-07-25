@@ -45,12 +45,15 @@ for file_name in os.listdir(path_mgf_info):
         dict_msms[title] = {'score': score, 'sequence': sequence}
 
 record_file = 'real_raw_msms_data.tfrecords'
-
+cnt = 0
 with tf.io.TFRecordWriter(record_file) as writer:
     for file_name in os.listdir(path_mgf):
         reader = mgf.read(path_mgf + '/' + file_name)
         print(file_name)
         for spectrum in reader:
+            cnt+=1
+            if(cnt%10000 == 0):
+                print(cnt)
             #title = rawfile ~ ~ 중 맨 앞 rawfile만 가져옴
             params_title = spectrum['params']['title'].split()[0]
             mz = np.array(100 * spectrum['m/z array'], dtype=np.int)

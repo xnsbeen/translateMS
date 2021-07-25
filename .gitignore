@@ -105,7 +105,8 @@ fabric.properties
 
 #personal environment file
 venv/
-/data/raw_msms_data.tfrecords
+/data/real_raw_msms_data.tfrecords
+/data/theoretical_raw_msms_data.tfrecords
 
 © 2021 GitHub, Inc.
 Terms

@@ -23,7 +23,8 @@ path_train_data='./data/preprocessed_train_data.tfrecords'
 path_valid_data='./data/preprocessed_valid_data.tfrecords'
 path_test_data='./data/preprocessed_test_data.tfrecords'
 
-train_dataset = tf.data.TFRecordDataset(path_train_data)
+size_train_dataset = 100000
+train_dataset = tf.data.TFRecordDataset(path_train_data).take(size_train_dataset)
 valid_dataset = tf.data.TFRecordDataset(path_valid_data).map(parse_function)
 test_dataset = tf.data.TFRecordDataset(path_test_data).map(parse_function)
 
@@ -40,7 +41,8 @@ AA_vocab_size = len(AA_vocab)+1
 print(f'mz vocab size : {mz_vocab_size}, AA vocab size : {AA_vocab_size}')
 
 #Set batchs
-BATCH_SIZE = 30
+BATCH_SIZE = 1024
+NUM_BATCHS = int(size_train_dataset/BATCH_SIZE)
 train_batches = (train_dataset
                  .map(parse_function)
                  .padded_batch(BATCH_SIZE)
@@ -55,7 +57,7 @@ d_ff : feedforward 차원
 D_MODEL = 64
 NUM_LAYERS = 2
 NUM_HEADS = 2
-DFF = 256
+DFF = 128
 DROPOUT_RATE = 0.2
 
 learning_rate = CustomSchedule(D_MODEL)
@@ -157,80 +159,43 @@ def train_step(input, target):
     train_accuracy(accuracy_function(target_real, predictions))
 
 
-@tf.function(input_signature=train_step_signature)
-def evaluate_amino_level(input, target):
+def evaluate_aminoacid_level(dataset):
+    batch_size = 500
+    num_batchs = 0
+    accuracy = 0
+    dataset_batchs = dataset.padded_batch(batch_size = batch_size, drop_remainder=True)
 
-    target_input = target[:, :-1]
-    target_real = target[:, 1:]
-    enc_padding_mask, combined_mask, dec_padding_mask = create_masks(input, target_input)
+    for batch, (input, target) in enumerate(dataset_batchs):
+        num_batchs = batch+1
 
-    predictions, _ = transformer(input, target_input,
-                               False,
-                               enc_padding_mask,
-                               combined_mask,
-                               dec_padding_mask)
+        target_input = target[:, :-1]
+        target_real = target[:, 1:]
+        enc_padding_mask, combined_mask, dec_padding_mask = create_masks(input, target_input)
 
-    train_accuracy(accuracy_function(target_real, predictions))
+        predictions, _ = transformer(input, target_input,
+                                   False,
+                                   enc_padding_mask,
+                                   combined_mask,
+                                   dec_padding_mask)
 
-'''
-def evaluate(dataset, max_length = 50):
+        accuracy += accuracy_function(target_real, predictions)
+
+    return accuracy/num_batchs
+
+def evaluate_peptide_level(dataset, max_length = 50):
     cnt_total =0
     cnt_correct = 0
-    
-    cnt_total+=1
+    for mz, sequence in dataset:
+        cnt_total+=1
 
-    encoder_input = tf.convert_to_tensor([mz])
-    len_seq = sequence.shape[0]
-    start, end = sequence[0], sequence[len_seq-1]
-    output = tf.convert_to_tensor([start])
-    output = tf.expand_dims(output, 0)
-
-    for i in range(max_length):
-        enc_padding_mask, combined_mask, dec_padding_mask = create_masks(
-            encoder_input, output)
-
-        # predictions.shape == (batch_size, seq_len, vocab_size)
-        predictions, attention_weights = transformer(encoder_input,
-                                                     output,
-                                                     False,
-                                                     enc_padding_mask,
-                                                     combined_mask,
-                                                     dec_padding_mask)
-
-        # select the last word from the seq_len dimension
-        predictions = predictions[:, -1:, :]  # (batch_size, 1, vocab_size)
-
-        predicted_id = tf.argmax(predictions, axis=-1)
-
-        # concatentate the predicted_id to the output which is given to the decoder
-        # as its input.
-        output = tf.concat([output, predicted_id], axis=-1)
-
-        # return the result if the predicted_id is equal to the end token
-        if predicted_id == end:
-          break
-    print(sequence, output)
-    if sequence == output[:,1:]:
-        cnt_correct += 1
-
-
-    return cnt_correct/cnt_total
-'''
-def evaluate_peptide_level(dataset, max_length = 50):
-    batch_size = 50
-    batchs = dataset.padded_batch(batch_size)
-
-    for batch, (mz, sequence) in enumerate(batchs):
-        encoder_input = mz
-        start, end = 1, 2
-        output = tf.convert_to_tensor([start], dtype=tf.int64)
+        encoder_input = tf.convert_to_tensor([mz])
+        start, end = 1,2
+        output = tf.convert_to_tensor([start],dtype=tf.int64)
         output = tf.expand_dims(output, 0)
-        output = tf.repeat(output, batch_size, axis= 0)
 
         for i in range(max_length):
             enc_padding_mask, combined_mask, dec_padding_mask = create_masks(
                 encoder_input, output)
-
             # predictions.shape == (batch_size, seq_len, vocab_size)
             predictions, attention_weights = transformer(encoder_input,
                                                          output,
@@ -238,25 +203,22 @@ def evaluate_peptide_level(dataset, max_length = 50):
                                                          enc_padding_mask,
                                                          combined_mask,
                                                          dec_padding_mask)
-
             # select the last word from the seq_len dimension
             predictions = predictions[:, -1:, :]  # (batch_size, 1, vocab_size)
+
             predicted_id = tf.argmax(predictions, axis=-1)
+
             # concatentate the predicted_id to the output which is given to the decoder
             # as its input.
-
             output = tf.concat([output, predicted_id], axis=-1)
+
             # return the result if the predicted_id is equal to the end token
             if predicted_id == end:
               break
-        print(sequence, output)
-        if sequence == output[:,1:]:
-            print(output[:,1:])
-    return 1
 
+    return cnt_correct/cnt_total
 
-
-EPOCHS = 20
+EPOCHS = 30
 for epoch in range(EPOCHS):
     start = time.time()
     train_loss.reset_states()
@@ -266,16 +228,15 @@ for epoch in range(EPOCHS):
         train_step(input, target)
 
         if (batch+1)%5 == 0 :
-            print(f'Epoch {epoch + 1} Batch {batch+1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
-
+            print(f'Epoch {epoch + 1} Batch {batch+1}/{NUM_BATCHS} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
 
     if (epoch + 1) % 5 == 0:
         ckpt_save_path = ckpt_manager.save()
         print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}')
 
     print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
-    evaluate_amino_level(valid_dataset)
-    print(f'Accuracy of validation data for peptide level : {train_accuracy.result()}')
+    print(f'Accuracy of validation data for amino acid level : {evaluate_aminoacid_level(valid_dataset):.4f}')
+    #print(f'Accuracy of validation data for peptide level : {evaluate_peptide_level(valid_dataset):.4f}')
 
     print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
 
