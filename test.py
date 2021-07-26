@@ -1,6 +1,5 @@
 import tensorflow as tf
 import time
-import numpy as np
 import pickle
 
 from transformer.model import Transformer
@@ -19,12 +18,8 @@ def parse_function(example_proto):
     sequence = parsed_example['sequence'].values
     return mz, sequence
 
-path_train_data='./data/preprocessed_train_data.tfrecords'
-path_valid_data='./data/preprocessed_valid_data.tfrecords'
 path_test_data='./data/preprocessed_test_data.tfrecords'
 
-train_dataset = tf.data.TFRecordDataset(path_train_data)
-valid_dataset = tf.data.TFRecordDataset(path_valid_data).map(parse_function)
 test_dataset = tf.data.TFRecordDataset(path_test_data).map(parse_function)
 
 #Load vocabulary
@@ -34,55 +29,108 @@ with open('./data/AA_vocab.pickle','rb') as f:
     AA_vocab = pickle.load(f)
 
 #Get vocabulary size
-mz_vocab_size = len(mz_vocab)
-AA_vocab_size = len(AA_vocab)
+mz_vocab_size = len(mz_vocab)+1
+AA_vocab_size = len(AA_vocab)+1
 
-#Set batchs
+
 '''
-BATCH_SIZE = 64
-train_batches = (train_dataset
-                 .map(parse_function)
-                 .padded_batch(BATCH_SIZE)
-                 .prefetch(tf.data.AUTOTUNE))
+d_model : input(embedding), ouput 차원
+num_layers : 인코더, 디코더 층
+num_heads : 멀티헤드 수
+d_ff : feedforward 차원 
 '''
+D_MODEL = 64
+NUM_LAYERS = 2
+NUM_HEADS = 2
+DFF = 128
+DROPOUT_RATE = 0.2
+
+learning_rate = CustomSchedule(D_MODEL)
+optimizer = tf.keras.optimizers.Adam(learning_rate,
+                                     beta_1=0.9,
+                                     beta_2=0.98,
+                                     epsilon=1e-9)
 
 
-def evaluate(dataset, max_length=50):
-    for mz, sequence in dataset.padded_batch(1).take(1):
-        print(mz, sequence)
-        '''
-        len_seq = sequence.shape[0]
-        start, end = sequence[0], sequence[len_seq-1]
-        print(start, end)
+transformer = Transformer(
+    num_layers=NUM_LAYERS,
+    d_model=D_MODEL,
+    num_heads=NUM_HEADS,
+    dff=DFF,
+    input_vocab_size=mz_vocab_size,
+    target_vocab_size=AA_vocab_size,
+    positional_encoding_input = 500000,
+    positional_encoding_target = 50,
+    dropout_rate=DROPOUT_RATE)
 
-        tens = tf.convert_to_tensor([1])
-        print(tf.expand_dims(tens,0))
-        '''
+def create_masks(input, target):
+    # Encoder padding mask
+    enc_padding_mask = create_padding_mask(input)
+    # Used in the 2nd attention block in the decoder.
+    # This padding mask is used to mask the encoder outputs.
+    dec_padding_mask = create_padding_mask(input)
+    # Used in the 1st attention block in the decoder.
+    # It is used to pad and mask future tokens in the input received by
+    # the decoder.
+    look_ahead_mask = create_look_ahead_mask(tf.shape(target)[1])
+    dec_target_padding_mask = create_padding_mask(target)
+    combined_mask = tf.maximum(dec_target_padding_mask, look_ahead_mask)
+
+    return enc_padding_mask, combined_mask, dec_padding_mask
+
+#save checkpoint
+checkpoint_path = "./checkpoints/train"
+
+ckpt = tf.train.Checkpoint(transformer=transformer,
+                           optimizer=optimizer)
+
+ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=5)
+
+# if a checkpoint exists, restore the latest checkpoint.
+if ckpt_manager.latest_checkpoint:
+    ckpt.restore(ckpt_manager.latest_checkpoint)
+    print('Latest checkpoint restored!!')
+
+def evaluate_peptide_level(dataset, max_length = 50):
+    cnt_total =0
+    cnt_correct = 0
+    for mz, sequence in dataset:
+        cnt_total+=1
+        if(cnt_total%10 == 0):
+            print(cnt_total)
+
+        encoder_input = tf.convert_to_tensor([mz])
+        start, end = 1,2
+        output = tf.convert_to_tensor([start],dtype=tf.int64)
+        output = tf.expand_dims(output, 0)
+
+        for i in range(max_length):
+            enc_padding_mask, combined_mask, dec_padding_mask = create_masks(
+                encoder_input, output)
+            # predictions.shape == (batch_size, seq_len, vocab_size)
+            predictions, attention_weights = transformer(encoder_input,
+                                                         output,
+                                                         False,
+                                                         enc_padding_mask,
+                                                         combined_mask,
+                                                         dec_padding_mask)
+            # select the last word from the seq_len dimension
+            predictions = predictions[:, -1:, :]  # (batch_size, 1, vocab_size)
+
+            predicted_id = tf.argmax(predictions, axis=-1)
+
+            # concatentate the predicted_id to the output which is given to the decoder
+            # as its input.
+            output = tf.concat([output, predicted_id], axis=-1)
+
+            # return the result if the predicted_id is equal to the end token
+            if predicted_id == end:
+                if tf.reduce_all(output == sequence):
+                    cnt_correct+=1
+                break
+
+    return cnt_correct/cnt_total
 
 
-emb = tf.convert_to_tensor(
-    [
-    [[1, 2, 3,5],
-    [3, 3, 5,7],
-    [4, 6, 7,8]],
+print(f'Accuracy of test data for peptide level : {evaluate_peptide_level(test_dataset):.4f}')
 
-    [[1, 2, 3,2],
-    [3, 3, 5,1],
-    [4, 6, 7,2]]
-    ],
-    dtype= tf.int64)
-
-d_model = 4
-
-inten = tf.convert_to_tensor(
-        [[1, 2, 3],
-         [3, 3, 3]],
-    dtype=tf.int64)
-
-print(inten[:,:,tf.newaxis])
-inten = inten[:,:,tf.newaxis]
-t = tf.repeat(inten, d_model, axis = 2)
-
-print(t)
-
-print(emb*t)
