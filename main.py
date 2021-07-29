@@ -21,7 +21,7 @@ def parse_function(example_proto):
 path_train_data='./data/preprocessed_train_data.tfrecords'
 path_valid_data='./data/preprocessed_valid_data.tfrecords'
 
-size_train_dataset = 100000
+size_train_dataset = 200000
 train_dataset = tf.data.TFRecordDataset(path_train_data).take(size_train_dataset)
 valid_dataset = tf.data.TFRecordDataset(path_valid_data).map(parse_function)
 
@@ -110,9 +110,9 @@ transformer = Transformer(
     d_model=D_MODEL,
     num_heads=NUM_HEADS,
     dff=DFF,
-    input_vocab_size=mz_vocab_size,
-    target_vocab_size=AA_vocab_size,
-    positional_encoding_input = 500000,
+    input_vocab_size=500000,
+    target_vocab_size=30,
+    positional_encoding_input = 1000,
     positional_encoding_target = 50,
     dropout_rate=DROPOUT_RATE)
 

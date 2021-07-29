@@ -57,9 +57,9 @@ transformer = Transformer(
     d_model=D_MODEL,
     num_heads=NUM_HEADS,
     dff=DFF,
-    input_vocab_size=mz_vocab_size,
-    target_vocab_size=AA_vocab_size,
-    positional_encoding_input = 500000,
+    input_vocab_size=500000,
+    target_vocab_size=30,
+    positional_encoding_input = 1000,
     positional_encoding_target = 50,
     dropout_rate=DROPOUT_RATE)
 
@@ -125,6 +125,7 @@ def evaluate_peptide_level(dataset, max_length = 50):
 
             # return the result if the predicted_id is equal to the end token
             if predicted_id == end:
+                print(output, sequence)
                 if tf.reduce_all(output == sequence):
                     cnt_correct+=1
                 break
