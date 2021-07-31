@@ -25,18 +25,6 @@ size_train_dataset = 300000
 train_dataset = tf.data.TFRecordDataset(path_train_data).take(size_train_dataset)
 valid_dataset = tf.data.TFRecordDataset(path_valid_data).map(parse_function)
 
-#Load vocabulary
-with open('./data/mz_vocab.pickle','rb') as f:
-    mz_vocab = pickle.load(f)
-with open('./data/AA_vocab.pickle','rb') as f:
-    AA_vocab = pickle.load(f)
-
-#Get vocabulary size
-mz_vocab_size = len(mz_vocab)+1
-AA_vocab_size = len(AA_vocab)+1
-
-print(f'mz vocab size : {mz_vocab_size}, AA vocab size : {AA_vocab_size}')
-
 #Set batchs
 BATCH_SIZE = 256
 NUM_BATCHS = int(size_train_dataset/BATCH_SIZE)
@@ -159,9 +147,10 @@ def train_step(input, target):
 
 
 def evaluate_aminoacid_level(dataset):
-    batch_size = 500
+    batch_size = 200
     num_batchs = 0
     accuracy = 0
+    loss = 0
     dataset_batchs = dataset.padded_batch(batch_size = batch_size, drop_remainder=True)
 
     for batch, (input, target) in enumerate(dataset_batchs):
@@ -176,10 +165,10 @@ def evaluate_aminoacid_level(dataset):
                                    enc_padding_mask,
                                    combined_mask,
                                    dec_padding_mask)
-
+        loss += loss_function(target_real, predictions)
         accuracy += accuracy_function(target_real, predictions)
 
-    return accuracy/num_batchs
+    return loss/num_batchs, accuracy/num_batchs
 
 
 EPOCHS = 30
@@ -193,16 +182,16 @@ while True:
     for batch, (input, target) in enumerate(train_batches):
         train_step(input, target)
 
-        if (batch+1)%10 == 0 :
-            print(f'Epoch {epoch + 1} Batch {batch+1}/{NUM_BATCHS} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
+        print('\r',f'Epoch {epoch + 1} | batch {batch+1}/{NUM_BATCHS} Loss {train_loss.result():.3f} Accuracy {train_accuracy.result():.4f}',end='')
 
     if (epoch + 1) % 5 == 0:
         ckpt_save_path = ckpt_manager.save()
         print(f'Saving checkpoint for epoch {epoch+1} at {ckpt_save_path}')
 
-    print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
-    print(f'Accuracy of validation data for amino acid level : {evaluate_aminoacid_level(valid_dataset):.4f}')
+    print('\r',f'Epoch {epoch + 1} : Time {time.time() - start:.2f}s')
+    print(f'\tTrain | Loss {train_loss.result():.3f}, Accuracy {train_accuracy.result():.3f}')
+    valid_loss, valid_accuracy = evaluate_aminoacid_level(valid_dataset)
+    print(f'\tValid | Loss {valid_loss:.3f}, Accuracy {valid_accuracy:.3f}')
 
     epoch+=1
-    print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
 
