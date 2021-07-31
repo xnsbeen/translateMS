@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import time
 import pickle
 
 class DataLoader:
@@ -20,12 +21,10 @@ class DataLoader:
       # Parse the input `tf.train.Example` proto using the dictionary above.
       return tf.io.parse_single_example(example_proto, self.feature_description)
 
-    def split(self, dataset, record_size=None, train_prop=0.99, valid_prop= 0.01,test_prop=0.01):
-        #
-        #dataset = dataset.shuffle(buffer_size=1000000)
+    def split(self, dataset, record_size,
+              train_prop=0.99, valid_prop= 0.01,test_prop=0.01):
 
-        if record_size != None:
-            dataset = dataset.take(record_size)
+        dataset = dataset.take(record_size)
 
         train_size = int(record_size*train_prop)
         valid_size = int(record_size*valid_prop)
@@ -55,7 +54,7 @@ def make_vocab(data,name):
 
     return vocab
 
-def encode_to_int(data,vocab):
+def encode_to_int_AA(data,vocab):
 
     for i in range(len(data)):
         encoded_record = list()
@@ -64,6 +63,11 @@ def encode_to_int(data,vocab):
                 encoded_record.append(vocab[data[i][j]])
         data[i] = [vocab['SOS']] + encoded_record + [vocab['EOS']]
 
+    return data
+
+def encode_to_int_mz(data,vocab):
+    for i in range(len(data)):
+        data[i] = [vocab['SOS']] + data[i] + [vocab['EOS']]
     return data
 
 
