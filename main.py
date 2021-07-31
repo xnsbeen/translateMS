@@ -21,7 +21,7 @@ def parse_function(example_proto):
 path_train_data='./data/preprocessed_train_data.tfrecords'
 path_valid_data='./data/preprocessed_valid_data.tfrecords'
 
-size_train_dataset = 200000
+size_train_dataset = 300000
 train_dataset = tf.data.TFRecordDataset(path_train_data).take(size_train_dataset)
 valid_dataset = tf.data.TFRecordDataset(path_valid_data).map(parse_function)
 
@@ -38,7 +38,7 @@ AA_vocab_size = len(AA_vocab)+1
 print(f'mz vocab size : {mz_vocab_size}, AA vocab size : {AA_vocab_size}')
 
 #Set batchs
-BATCH_SIZE = 1024
+BATCH_SIZE = 256
 NUM_BATCHS = int(size_train_dataset/BATCH_SIZE)
 train_batches = (train_dataset
                  .map(parse_function)
@@ -183,7 +183,9 @@ def evaluate_aminoacid_level(dataset):
 
 
 EPOCHS = 30
-for epoch in range(EPOCHS):
+epoch = 0
+#for epoch in range(EPOCHS):
+while True:
     start = time.time()
     train_loss.reset_states()
     train_accuracy.reset_states()
@@ -201,5 +203,6 @@ for epoch in range(EPOCHS):
     print(f'Epoch {epoch + 1} Loss {train_loss.result():.4f} Accuracy {train_accuracy.result():.4f}')
     print(f'Accuracy of validation data for amino acid level : {evaluate_aminoacid_level(valid_dataset):.4f}')
 
+    epoch+=1
     print(f'Time taken for 1 epoch: {time.time() - start:.2f} secs\n')
 
