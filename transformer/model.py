@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 
-
 def get_angles(position, i, d_model):
     angles = 1 / tf.pow(10000, (2 * (i // 2)) / tf.cast(d_model, tf.float32))
     return position * angles
@@ -15,7 +14,7 @@ def positional_encoding(position, d_model):
     # list[<start>:<end>:<step>] even indices '0::2'
     sines = tf.math.sin(angle_rads[:, 0::2])
 
-    # list[<start>:<end>:<step>] even indices '1::2'
+    # list[<start>:<end>:<step>] odd indices '1::2'
     cosines = tf.math.cos(angle_rads[:, 1::2])
 
     angle_rads = np.zeros(angle_rads.shape)
@@ -32,7 +31,6 @@ def create_padding_mask(seq):
   # add extra dimensions to add the padding
   # to the attention logits.
   return seq[:, tf.newaxis, tf.newaxis, :]  # (batch_size, 1, 1, seq_len)
-
 
 def create_look_ahead_mask(size):
     look_ahead_mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
@@ -288,4 +286,90 @@ class Transformer(tf.keras.Model):
 
     final_output = self.final_layer(dec_output)  # (batch_size, tar_seq_len, target_vocab_size)
 
-    return final_output, attention_weights
+    return enc_output, dec_output, final_output, attention_weights
+
+'''
+Modeling for transfer learning
+'''
+
+class Encoder2(tf.keras.layers.Layer):
+  def __init__(self, num_layers, d_model, num_heads, dff,
+               intensity_vocab_size, dropout_rate=0.1):
+    super(Encoder2, self).__init__()
+
+    self.d_model = d_model
+    self.num_layers = num_layers
+
+    self.embedding = tf.keras.layers.Embedding(intensity_vocab_size, self.d_model)
+
+    self.enc_layers = [EncoderLayer(d_model, num_heads, dff, dropout_rate)
+                       for _ in range(num_layers)]
+
+    self.dropout = tf.keras.layers.Dropout(dropout_rate)
+
+  def call(self, x, intensity, training, mask):
+
+    # adding embedding and position encoding.
+    intensity = self.embedding(intensity)  # (batch_size, intensity_seq_len, d_model)
+    x += intensity
+
+    x = self.dropout(x, training=training)
+
+    for i in range(self.num_layers):
+      x = self.enc_layers[i](x, training, mask)
+
+    return x  # (batch_size, input_seq_len, d_model)
+
+class Decoder2(tf.keras.layers.Layer):
+  def __init__(self, num_layers, d_model, num_heads, dff, dropout_rate=0.1):
+
+    super(Decoder2, self).__init__()
+
+    self.d_model = d_model
+    self.num_layers = num_layers
+
+    self.dec_layers = [DecoderLayer(d_model, num_heads, dff, dropout_rate)
+                       for _ in range(num_layers)]
+    self.dropout = tf.keras.layers.Dropout(dropout_rate)
+
+  def call(self, x, enc_output, training,
+           look_ahead_mask, padding_mask):
+
+    attention_weights = {}
+
+    x = self.dropout(x, training=training)
+
+    for i in range(self.num_layers):
+      x, block1, block2 = self.dec_layers[i](x, enc_output, training,
+                                             look_ahead_mask, padding_mask)
+
+      attention_weights[f'decoder_layer{i+1}_block1'] = block1
+      attention_weights[f'decoder_layer{i+1}_block2'] = block2
+
+    # x.shape == (batch_size, target_seq_len, d_model)
+    return x, attention_weights
+
+class ModifiedTransformer(tf.keras.Model):
+  def __init__(self, num_layers, d_model, num_heads, dff,
+               intensity_vocab_size, target_vocab_size, dropout_rate=0.1):
+      super(ModifiedTransformer, self).__init__()
+
+      self.encoder = Encoder2(num_layers, d_model, num_heads, dff,
+                              intensity_vocab_size, dropout_rate)
+
+      self.decoder = Decoder2(num_layers, d_model, num_heads,
+                              dff, dropout_rate)
+
+      self.final_layer = tf.keras.layers.Dense(target_vocab_size)
+
+  def call(self, input, intensity, target, training, enc_padding_mask,
+           look_ahead_mask, dec_padding_mask):
+      enc_output = self.encoder(input, intensity, training, enc_padding_mask)  # (batch_size, input_seq_len, d_model)
+
+      # dec_output.shape == (batch_size, tar_seq_len, d_model)
+      dec_output, attention_weights = self.decoder(
+          target, enc_output, training, look_ahead_mask, dec_padding_mask)
+
+      final_output = self.final_layer(dec_output)  # (batch_size, tar_seq_len, target_vocab_size)
+
+      return final_output, attention_weights

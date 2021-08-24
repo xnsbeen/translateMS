@@ -27,12 +27,12 @@ record_file = 'theoretical_raw_msms_data.tfrecords'
 
 starting_time = time.time()
 
+'''
 rand_idx = np.random.choice(7440000, 1000000, replace=False)
 index = np.array([False] * 7440000)
 index[rand_idx] = True
 print('data 개수 확인')
-
-f = open(file_path, "r")
+'''
 
 with tf.io.TFRecordWriter(record_file) as writer:
     cnt = -1
@@ -44,9 +44,6 @@ with tf.io.TFRecordWriter(record_file) as writer:
                 print(f'[count] : {cnt}', f'[time] : {time.time() - starting_time}')
 
             cnt += 1
-            if index[cnt] == False :
-                continue
-
             record = record.split('\t')
 
             #bytes(utf-8)형으로 변환
